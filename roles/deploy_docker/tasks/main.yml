@@ -1,0 +1,95 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_docker/tasks/main.yml \
+# --extra-var "target=l-dev-dck-01 ent=VP env=DEV"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Install prerequiste packages
+      apt:
+        name: "{{ packages }}"
+        update_cache: true
+        state: latest
+      vars:
+        packages:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - cifs-utils
+        - software-properties-common
+        - gnupg-agent
+        - htop
+        - wget
+        - nfs-common
+
+    - name: add key docker repository
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+
+    - name: add docker repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+        state: present
+
+    - name: Install docker packages
+      apt:
+        name: "{{ packages }}"
+        update_cache: true
+        state: present
+      vars:
+        packages:
+        - docker-ce=5:19.03.8~3-0~debian-buster
+        - docker-ce-cli=5:19.03.8~3-0~debian-buster
+        - containerd.io=1.2.13-1
+
+    - name: Install CTOP
+      get_url:
+        url: https://github.com/bcicen/ctop/releases/download/v0.7.3/ctop-0.7.3-linux-amd64
+        dest: /usr/local/bin/ctop
+        mode: '0755'
+
+    - name: Create mount nfs directory
+      file:
+        path: /mnt/nfs
+        state: directory
+
+    - include: mount-dev-directory.yml
+      when: env == 'DEV'
+
+    - include: mount-rec-directory.yml
+      when: env == 'REC'
+
+    - include: mount-prd-directory.yml
+      when: env == 'PRD'
+
+    - name: Disable SWAP in fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: iptables flush filter
+      iptables:
+        chain: "{{ item }}"
+        flush: yes
+      with_items:  [ 'INPUT', 'FORWARD', 'OUTPUT' ]
+
+    - name: Set the policy for the INPUT chain to ACCEPT
+      iptables:
+        chain: INPUT
+        policy: ACCEPT
+
+    - name: Set the policy for the OUTPUT chain to ACCEPT
+      iptables:
+        chain: OUTPUT
+        policy: ACCEPT
+
+    - name: Set the policy for the FORWARD chain to ACCEPT
+      iptables:
+        chain: FORWARD
+        policy: ACCEPT
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}

@@ -1,0 +1,31 @@
+- hosts: '{{ target }}'
+  tasks:
+    - name: install packages
+      yum:
+        update_cache=yes
+        state=latest
+        name={{ item }}
+      with_items:
+        - vim
+        - nano
+
+    - name: copie fichier de conf .bashrc
+      copy:
+        src=files/.bashrc
+        dest=/root/.bashrc
+        owner=root
+        group=root
+
+    - name: copie fichier de conf bash.bashrc
+      copy:
+        src=files/bash.bashrc
+        dest=/etc/bash.bashrc
+        owner=root
+        group=root
+
+    - name: copie fichier de conf vim
+      copy:
+        src=files/vimrc
+        dest=/etc/vimrc
+        owner=root
+        group=root

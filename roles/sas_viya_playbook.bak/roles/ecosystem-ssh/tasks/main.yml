@@ -1,0 +1,59 @@
+---
+# tasks file for ecosystem-ssh
+
+- debug: 
+    var: setup_sas_users
+    # verbosity: 2
+  when: sas_deploy_debug | bool == true
+
+- debug: 
+    var: sas_users
+    # verbosity: 2
+  when: sas_deploy_debug | bool == true
+
+- debug: 
+    var: ssh_hosts
+    # verbosity: 2
+  when: sas_deploy_debug | bool == true
+
+- name: Remove and add the host from the known_hosts file
+  shell: ssh-keygen -f ~{{ item.1 }}/.ssh/known_hosts -R {{ hostvars[item.0].sas_vars.hostname_fqdn }}; ssh-keyscan {{ hostvars[item.0].sas_vars.hostname_fqdn }} >> ~{{ item.1 }}/.ssh/known_hosts
+  when: ( setup_sas_users | bool ) == true and item.0 != inventory_hostname
+  become: yes
+  become_user: "{{ item.1 }}"
+  with_nested:
+    - "{{ groups[ssh_hosts] }}"
+    - "{{ sas_users }}"
+
+- name: Create temporary directory on Ansible machine
+  local_action: shell mktemp -d
+  when: ( setup_sas_users | bool ) == true
+  run_once: yes
+  register: mktempresult
+
+- name: "Define temp directory as {{ mktempresult.stdout }}"
+  set_fact:
+    temp_ssh_cert_dir: "{{ mktempresult.stdout }}"
+  when: ( setup_sas_users | bool ) == true
+
+- name: Fetch user's public key from other hosts
+  become: 'yes'
+  fetch: src="~{{ item.key }}/.ssh/id_rsa.pub" dest="{{ temp_ssh_cert_dir }}/ssh/{{ inventory_hostname_short }}/{{ item.key }}/" flat=yes fail_on_missing=yes
+  when: ( setup_sas_users | bool ) == true and groups[ssh_hosts] is defined and inventory_hostname in groups[ssh_hosts]
+  with_dict: "{{ sas_users }}"
+
+- name: Add user's public key to authorized keys
+  authorized_key:
+    user: "{{ item.1 }}"
+    key: "{{ lookup('file', temp_ssh_cert_dir + '/ssh/' + item.0 + '/' + item.1 + '/id_rsa.pub' ) }}"
+    state: present
+  when: ( setup_sas_users | bool ) == true and inventory_hostname != item.0
+  become: yes
+  with_nested:
+    - "{{ groups[ssh_hosts] }}"
+    - "{{ sas_users }}"
+
+- name: "Remove {{ temp_ssh_cert_dir }}"
+  local_action: file path="{{ temp_ssh_cert_dir }}" state=absent
+  when: ( setup_sas_users | bool ) == true
+  run_once: yes

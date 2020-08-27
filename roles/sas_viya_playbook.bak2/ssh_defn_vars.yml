@@ -1,0 +1,5 @@
+SSH_DEFINITIONS:
+  default:
+    hosts:
+    - deployTarget
+    user: cas

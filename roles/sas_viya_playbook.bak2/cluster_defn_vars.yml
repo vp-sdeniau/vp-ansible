@@ -1,0 +1,19 @@
+CLUSTER_DEFINITIONS:
+  cas:
+    default:
+      primary_host: "deployTarget"
+      secondary_host:
+      worker_hosts:
+      tenant: shared
+      casenv_user: cas
+      casenv_group: sas
+      cas:
+        SERVICESBASEURL: https://indicateurs.vecteurplus.com
+      env:
+        CAS_DISK_CACHE: /sastmp/cascache
+        CAS_VIRTUAL_PROTO: https
+        CAS_VIRTUAL_HOST: indicateurs.vecteurplus.com
+        CAS_VIRTUAL_PORT: 443
+      settings:
+        001_JAVA_HOME: /usr/lib/jvm/jre-1.8.0
+        002_LD_LIBRARY_PATH: '$LD_LIBRARY_PATH:$JAVA_HOME/lib/amd64/server'

@@ -1,0 +1,7 @@
+---
+# This play validates the entries of the SAS Viya PostgreSQl Infrastructure Data Server in inventory.ini and vars.yml
+postgres_port_numbers: []
+sasdatasvrc_hostname_unmatched: "Host names for sasdatasvrc do not match between the inventory file and vars.yml"
+pgpoolc_hostname_unmatched: "Host names for pgpoolc do not match between the inventory file and vars.yml"
+sasdatasvrc_node_number_instances: []
+pgpoolc_pool_number_instances: []

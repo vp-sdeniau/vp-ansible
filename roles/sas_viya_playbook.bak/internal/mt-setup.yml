@@ -1,0 +1,122 @@
+---
+# file: mt-setup.yml
+
+# This creates directories specific for a given tenant
+
+- name: "Setup for tenant"
+  hosts: ComputeServer:programming:sas-casserver*
+  gather_facts: false
+  become: false
+  any_errors_fatal: true
+
+  vars:
+    tenant_setup_conf: "{{ SASROOT }}/{{ DEPLOYMENT_ID }}/config/tenant_setup.conf"
+
+  tasks:
+    - name: Make sure DEPLOYMENT_ID is not a reserved value
+      fail:
+        msg: "The tenant ID '{{ DEPLOYMENT_ID }}' is a reserved value. Specify another tenant ID."
+      when: DEPLOYMENT_ID | lower == "viya" or DEPLOYMENT_ID | lower == "spre" or DEPLOYMENT_ID | lower == "default" or DEPLOYMENT_ID | lower == "provider" or DEPLOYMENT_ID | lower == "shared" or DEPLOYMENT_ID | lower == "sharedservices" or DEPLOYMENT_ID | lower == "uaa" or DEPLOYMENT_ID | lower | match("sas.*")
+
+    - name: Make sure DEPLOYMENT_ID is at least 1 character
+      fail:
+        msg: "The tenant ID must be specified."
+      when: DEPLOYMENT_ID | length < 1
+
+    - name: Make sure DEPLOYMENT_ID is not more than 16 characters
+      fail:
+        msg: "The tenant ID cannot be longer than 16 characters."
+      when: DEPLOYMENT_ID | length > 16
+
+    - name: Make sure DEPLOYMENT_ID starts with a lowercase letter
+      fail:
+        msg: "The tenant ID must start with a lowercase letter."
+      when: DEPLOYMENT_ID is not search("^[a-z]")
+
+    - name: Make sure DEPLOYMENT_ID is lowercase letters or numbers
+      fail:
+        msg: "The tenant ID must be lowercase letters or numbers."
+      when: DEPLOYMENT_ID is not search("^[a-z][a-z0-9]*$")
+      
+    - name: Make sure tenant_admin_group is at least 1 character
+      fail:
+        msg: "The tenant admin group must be specified."
+      when: tenant_admin_group | length < 1
+
+#     - name: Make sure tenant_admin_group is not more than 16 characters
+#       fail:
+#         msg: "The tenant admin group cannot be longer than 16 characters."
+#       when: tenant_admin_group | length > 16
+
+    - name: Make sure tenant_admin_group starts not with a dash
+      fail:
+        msg: "The tenant admin group must not start with a dash character."
+      when: tenant_admin_group is search("^[-]")
+
+    - name: Make sure tenant_admin_group is letters or numbers
+      fail:
+         msg: "The tenant admin group must consist of letters, numbers, dashes, or underscores."
+      when: tenant_admin_group is not search("^[-a-zA-Z0-9_]*$")
+
+    - name: Make sure tenant_users_group is at least 1 character
+      fail:
+        msg: "The tenant users group must be specified."
+      when: tenant_users_group | length < 1
+
+#   - name: Make sure tenant_users_group is not more than 16 characters
+#     fail:
+#       msg: "The tenant users group cannot be longer than 16 characters."
+#     when: tenant_users_group | length > 16
+
+    - name: Make sure tenant_users_group starts not with a dash
+      fail:
+        msg: "The tenant users group must not start with a dash character."
+      when: tenant_users_group is search("^[-]")
+
+    - name: Make sure tenant_users_group is letters or numbers
+      fail:
+        msg: "The tenant users group must consist of letters, numbers, dashes, or underscores."
+      when: tenant_users_group is not search("^[-a-zA-Z0-9_]*$")
+
+    - name: Create directory
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+        owner: "{{ tenant_admin }}"
+        group: "{{ tenant_admin_group }}"
+      become: yes
+      become_user: root
+      with_items:
+        - "{{ SASROOT }}/{{ DEPLOYMENT_ID }}"
+        - "{{ SASROOT }}/{{ DEPLOYMENT_ID }}/config"
+
+    - name: Create file
+      file:
+        path: "{{ tenant_setup_conf }}"
+        state: touch
+        mode: "0664"
+        owner: "{{ tenant_admin }}"
+        group: "{{ tenant_admin_group }}"
+      become: yes
+      become_user: "{{ tenant_admin }}"
+
+    - name: Add environment variables
+      become: 'yes'
+      become_user: "{{ tenant_admin }}"
+      lineinfile:
+        dest: "{{ tenant_setup_conf }}"
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line}}"
+      with_items:
+        - { regex: "^\\s*export\\s+SASROOT\\s*=",             line: "export SASROOT='{{ SASROOT }}'" }
+        - { regex: "^\\s*export\\s+SASTENANT\\s*=",           line: "export SASTENANT='{{ sas_tenant }}'" }
+        - { regex: "^\\s*export\\s+SASTENANTADMIN\\s*=",      line: "export SASTENANTADMIN='{{ tenant_admin }}'" }
+        - { regex: "^\\s*export\\s+SASTENANTADMINGROUP\\s*=", line: "export SASTENANTADMINGROUP='{{ tenant_admin_group }}'" }
+        - { regex: "^\\s*export\\s+SASTENANTUSERSGROUP\\s*=", line: "export SASTENANTUSERSGROUP='{{ tenant_users_group }}'" }
+
+    - name: Run the script to setup tenant directories
+      command: '{{ SASROOT }}/viya/home/bin/tenant_setup.sh --file {{ tenant_setup_conf }}'
+      become: yes
+      become_user: root
+...

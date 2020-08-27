@@ -1,0 +1,22 @@
+---
+- name: Mount EBP dev share to nfs directory
+  mount:
+    path: /mnt/nfs
+    src: 10.53.2.50:/DATA/docker_dev
+    fstype: nfs
+    opts: defaults
+    dump: '0'
+    passno: '0'
+    state: mounted
+  when: ent == 'EBP'
+
+- name: Mount VP dev share to nfs directory
+  mount:
+    path: /mnt/nfs
+    src: 172.17.0.13:/var/DATA_DEV
+    fstype: nfs
+    opts: defaults
+    dump: '0'
+    passno: '0'
+    state: mounted
+  when: ent == 'VP'

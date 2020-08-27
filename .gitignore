@@ -1,0 +1,5 @@
+.idea/
+vp-ansible.iml
+.vault_pass
+.retry
+roles/sas_viya_playbook

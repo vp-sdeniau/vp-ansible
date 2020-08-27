@@ -1,0 +1,154 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_elasticsearch/tasks/install_Elasticsearch-1.7.2.yml \
+# --extra-var "target=es_rec_dp env=REC app=DP port_es=9202"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Install prerequiste packages
+      apt:
+        update_cache=yes
+        state=latest
+        name={{ item }}
+      with_items:
+        - default-jre
+        - jq
+        - curl
+        - cifs-utils
+        - nfs-common
+
+    - name: Create directory for backup
+      file:
+        path: /var/es_backup
+        state: directory
+        owner: root
+        group: root
+        mode: 0777
+
+    - name: Update environment file for JAVA
+      copy:
+        content: 'JAVA_HOME=/usr/lib/jvm/default-java'
+        dest: "/etc/environment"
+
+    - name: Source environment file
+      shell: "{{ item }}"
+      with_items:
+        - source /etc/environment
+      args:
+        executable: /bin/bash
+
+    - name: Download elasticsearch 1.7.2
+      get_url:
+        url: https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.7.2.deb
+        dest: /tmp/elasticsearch-1.7.2.deb
+
+    - name: Install elasticsearch 1.7.2
+      apt:
+        deb: /tmp/elasticsearch-1.7.2.deb
+
+    - name: Updating elasticsearch.yml file
+      template:
+        src: elasticsearch_{{ env }}_{{ app }}.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+
+    - name: Copy enviroment file
+      copy:
+        src=files/{{ env }}/environment_{{ app }}
+        dest=/etc/environment
+        owner=root
+        group=root
+
+    - name: Source environment file
+      shell: "{{ item }}"
+      with_items:
+        - source /etc/environment
+      args:
+        executable: /bin/bash
+
+    - name: Add LimitMEMLOCK conf to elasticsearch.service
+      lineinfile:
+        path: /usr/lib/systemd/system/elasticsearch.service
+        line: 'LimitMEMLOCK=infinity'
+        create: yes
+
+    - name: Start service elasticsearch
+      service:
+        name=elasticsearch
+        state=started
+
+    - name: Reload daemon
+      command: systemctl daemon-reload
+
+    - name: Set autostartup elasticsearch service
+      command: systemctl enable elasticsearch.service
+
+    - name: Remove temporary files
+      file:
+        path: /tmp/elasticsearch-1.7.2.deb
+        state: absent
+
+    - name: Copy credentials file
+      copy:
+        src=files/.smbcred
+        dest=/root/.smbcred
+        owner=root
+        group=root
+
+    - name: Copy backup scripts
+      copy:
+        src=files/elastic_script
+        dest=/var/lib/
+        owner=root
+        group=root
+      when: "'03' in ansible_hostname or '13' in ansible_hostname or '23' in ansible_hostname"
+
+    - name: Create elasticsearch backup directory
+      file:
+        path: "/mnt/elasticsearch_backup"
+        state: directory
+
+    - name: Mount share to backup repository
+      mount:
+        path: /mnt/elasticsearch_backup
+        src: l-inf-bck-03.groupe-vecteurplus.com:/var/elasticsearch_bck_{{ app }}
+        fstype: nfs
+        opts: defaults
+        dump: '0'
+        passno: '0'
+        state: mounted
+
+# Ajouter chown elasticsearch:elasticsearch /mnt/elasticsearch_backup/{{ app }}
+
+    - name: Waiting for a few seconds
+      pause:
+        seconds: 10
+
+    - name: Updating elasticsearch_script.sh file
+      template:
+        src: elasticsearch_backup.sh.j2
+        dest: '/var/lib/elastic_script/elasticsearch_backup.sh'
+      when: "'03' in ansible_hostname or '13' in ansible_hostname or '23' in ansible_hostname"
+
+    - name: Updating permission elasticsearch_script.sh
+      file:
+        path: '/var/lib/elastic_script/elasticsearch_backup.sh'
+        mode: '755'
+      when: "'03' in ansible_hostname or '13' in ansible_hostname or '23' in ansible_hostname"
+
+    - name: Create cron task for backup script
+      cron:
+        name: "backup elasticsearch"
+        minute: "0"
+        hour: "23"
+        job: "/bin/bash /var/lib/elastic_script/elasticsearch_backup.sh > /var/lib/elastic_script/backup.log 2>&1"
+      when: "'03' in ansible_hostname or '13' in ansible_hostname or '23' in ansible_hostname"
+
+    - name: Create repository backup elasticsearch
+      uri:
+        url: http://{{ ansible_default_ipv4.address }}:{{ port_es }}/_snapshot/backup
+        method: PUT
+        body: '{"type":"fs","settings":{"location":"{{ app }}","compress":true}}'
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      when: "'01' in ansible_hostname or '11' in ansible_hostname or '21' in ansible_hostname"

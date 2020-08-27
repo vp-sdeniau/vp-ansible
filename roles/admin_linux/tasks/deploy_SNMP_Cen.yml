@@ -1,0 +1,23 @@
+- hosts: 'l-prd-sas-01'
+  tasks:
+    - name: install packages net-snmp
+      yum:
+        name=net-snmp
+        state=latest
+
+    - name: install packages net-snmp-utils
+      yum:
+        name=net-snmp-utils
+        state=latest
+
+    - name: copie fichier de conf snmpd.conf
+      copy:
+        src=files/snmpd.conf
+        dest=/etc/snmp/snmpd.conf
+        owner=root
+        group=root
+
+    - name: restart service snmpd
+      service:
+        name=snmpd
+        state=restarted

@@ -1,0 +1,36 @@
+---
+# file: mt-sasgpud.yml
+
+- name: "SAS GPU Reservation Service"
+  hosts: sas-casserver*
+  any_errors_fatal: true
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Check if sas-sasgpudcfg is installed
+      command: rpm -q --quiet sas-sasgpudcfg
+      args:
+        warn: False
+      become: yes
+      become_user: root
+      register: sas_sasgpudcfg_query
+      failed_when: sas_sasgpudcfg_query.rc > 0
+      changed_when: False
+
+    - name: See if the sasgpud service is running
+      command: pgrep -x sasgpud
+      register: sas_sasgpudcfg_pgrep
+      ignore_errors: true
+
+    - block:
+
+      - include_role:
+          name: sasgpudcfg-x64_redhat_linux_6-yum
+        when: inventory_hostname in groups['sas-hosts-x64_redhat_linux_6-yum'] | default([])
+      - include_role:
+          name: sasgpudcfg-x64_suse_linux_12-yum
+        when: inventory_hostname in groups['sas-hosts-x64_suse_linux_12-yum'] | default([])
+
+      when: sas_sasgpudcfg_pgrep.rc == 1
+...

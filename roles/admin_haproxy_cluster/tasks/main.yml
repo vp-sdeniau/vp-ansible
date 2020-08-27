@@ -1,0 +1,56 @@
+---
+- hosts: L-REC-NLB-01
+  remote_user: root
+
+  tasks:
+    - name: Set server VPPPRNODEPR1 to disable state
+      haproxy:
+        state: disabled
+        host: VPPPRNODEPR1
+        socket: /tmp/haproxy.socket
+        backend: VPPPRNODEPRx_http_ipvANY
+        #drain: yes
+        wait: yes
+        wait_interval: 1
+        wait_retries: 60
+      tags:
+        - disable_green
+
+    - name: Set server VPPPRNODEPR1 to enable state
+      haproxy:
+        state: enabled
+        host: VPPPRNODEPR1
+        socket: /tmp/haproxy.socket
+        backend: VPPPRNODEPRx_http_ipvANY
+        #draining: yes
+        wait: yes
+        wait_interval: 10
+        wait_retries: 5
+      tags:
+        - enable_green
+
+    - name: Set server VPPPRNODEPR2 to disable state
+      haproxy:
+        state: disabled
+        host: VPPPRNODEPR2
+        socket: /tmp/haproxy.socket
+        backend: VPPPRNODEPRx_http_ipvANY
+        #drain: yes
+        wait: yes
+        wait_interval: 1
+        wait_retries: 60
+      tags:
+        - disable_blue
+
+    - name: Set server VPPPRNODEPR2 to enable state
+      haproxy:
+        state: enabled
+        host: VPPPRNODEPR2
+        socket: /tmp/haproxy.socket
+        backend: VPPPRNODEPRx_http_ipvANY
+        #draining: yes
+        wait: yes
+        wait_interval: 10
+        wait_retries: 5
+      tags:
+        - enable_blue

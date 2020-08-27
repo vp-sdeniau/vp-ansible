@@ -1,0 +1,40 @@
+- name: create vm
+  hosts: vcenter
+  connection: local
+
+  vars:
+    validate_certs: no
+    vcenter_host: '{{ inventory_hostname }}'
+    esxi_host: 'l-dev-esx-01.groupe-vecteurplus.com'
+    vcenter_datacenter: 'Datacenter_OT'
+    cluster: '03_DEVELOPPEMENT'
+    vcenter_datastore: 'VNX1_DEV_SAS10K_3'
+    vcenter_folder: '03_DEVELOPPEMENT'
+
+    vms:
+    - guest: 'vmTest'
+      vcpu_hotadd: 'no'
+      mem_hotadd: 'no'
+      notes: 'Ansible Created VM'
+      num_disks: 1
+      osid: 'ubuntu64Guest'
+
+  tasks:
+    - name: create vms (Single Disk)
+      vsphere_guest:
+        validate_certs: no
+        guest: "{{ item['guest'] }}"
+        from_template: 'yes'
+        template_src: 'L-TMP-DEB-09'
+        vcenter_hostname: "{{ vcenter_host }}"
+        username: "{{ vcenter_user }}"
+        password: "{{ vcenter_pass }}"
+        vm_extra_config:
+          notes: "{{ item['notes']|default(omit) }}"
+          folder: "{{ vcenter_folder }}"
+        vm_hardware:
+          osid: "{{ item['osid'] }}"
+        esxi:
+          datacenter: "{{ vcenter_datacenter }}"
+          hostname: "{{ esxi_host }}"
+      with_items: "{{ vms }}"

@@ -1,0 +1,56 @@
+- name: Install and configure windows sensu client
+  hosts: '{{ target }}'
+  tasks:
+    - name: Copy Sensu client MSI
+      win_copy:
+        src: \\groupe-vecteurplus.com\NETLOGON\ansible_repo\windows_bin\sources\2012_plus\sensu-1.2.1-2-x64.msi
+        dest: C:\temp\
+        remote_src: True
+
+    - name: Install Sensu MSI
+      win_package:
+        path: C:\temp\sensu-1.2.1-2-x64.msi
+        product_id: '{54F3D52D-A55B-4D7E-A336-50A5D53DC67B}'
+
+    - name: Copy configuration file
+      win_copy:
+        src: \\groupe-vecteurplus.com\NETLOGON\ansible_repo\windows_bin\sensu
+        dest: C:\opt
+        remote_src: True
+
+    - name: sensu-plugins-disk-checks
+      win_shell: gem install sensu-plugins-disk-checks
+
+    - name: sensu-plugins-windows
+      win_shell: gem install sensu-plugins-windows
+
+    - name: Firewall rule to allow connection of the sensu client to sensu-server redis
+      win_firewall_rule:
+        name: INFRA - Sensu client
+        remoteport: 6379
+        remoteip: 172.28.0.1-172.28.0.3
+        action: allow
+        direction: Out
+        protocol: TCP
+        state: present
+        enable: yes
+
+    - name: Grant sensu service user for "Log On As Service" for
+      script: /etc/ansible/roles/sensu/files/Add_Account_To_LogonAsService.ps1 'GROUPE-VPLUS\svc_sensu'
+
+    - name: Install the Sensu client Windows service
+      win_service:
+        name: sensu-client
+        username: svc_sensu@groupe-vecteurplus.com
+        password: X69tk44mf
+        path: c:\opt\sensu\bin\sensu-client.exe
+        display_name: Sensu Client
+        start_mode: delayed
+
+    - name: "Include Config tasks"
+      include: "windows_config.yml"
+
+    - name: Remove temporary files
+      win_file:
+        path: C:\temp\sensu-1.2.1-2-x64.msi
+        state: absent

@@ -1,0 +1,135 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-4.0.yml \
+# --extra-var "target=mdb_prd_nk env=PRD app=NK"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Install prerequiste packages
+      apt:
+        update_cache=yes
+        state=latest
+        name={{ item }}
+      with_items:
+        - cifs-utils
+        - dirmngr
+        - apt-transport-https
+
+    - name: add key ubuntu repository
+      apt_key:
+        keyserver: keyserver.ubuntu.com
+        id: 9DA31620334BD75D9DCB49F368818C72E52529D4
+
+    - apt_repository:
+        repo: deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main
+        state: present
+        filename: mongodb-org-4.0.list
+
+    - name: install mongodb_4.0.9
+      apt:
+        update_cache=yes
+        state=present
+        name={{ item }}
+      with_items:
+          - mongodb-org=4.0.9
+
+    - name: Updating mongod.conf file
+      template:
+        src: mongod.conf.j2
+        dest: '/etc/mongod.conf'
+
+    - name: Set nofile limit for all users
+      pam_limits:
+        domain: "*"
+        limit_type: '-'
+        limit_item: nofile
+        value: 64000
+
+    - name: Set nproc limit for all users
+      pam_limits:
+        domain: "*"
+        limit_type: '-'
+        limit_item: nproc
+        value: 64000
+
+    - name: Set memlock limit for all users
+      pam_limits:
+        domain: "*"
+        limit_type: '-'
+        limit_item: memlock
+        value: unlimited
+
+    - name: Set nofile limit for root users
+      pam_limits:
+        domain: root
+        limit_type: '-'
+        limit_item: nofile
+        value: 64000
+
+    - name: Set nproc limit for root users
+      pam_limits:
+        domain: root
+        limit_type: '-'
+        limit_item: nproc
+        value: 64000
+
+    - name: Set memlock limit for root users
+      pam_limits:
+        domain: root
+        limit_type: '-'
+        limit_item: memlock
+        value: unlimited
+
+    - name: start service mongod
+      service:
+        name=mongod
+        state=started
+
+    - name: reload daemon
+      command: systemctl daemon-reload
+
+    - name: set autostartup mongod service
+      command: systemctl enable mongod.service
+
+    - name: Copy backup scripts
+      copy:
+        src=files/mongo_script
+        dest=/var/lib/
+        owner=root
+        group=root
+
+    - name: Copy credentials file
+      copy:
+        src=files/.smbcred
+        dest=/root/.smbcred
+        owner=root
+        group=root
+
+    - name: Updating mongo_script.sh file
+      template:
+        src: mongodb_backup_Standalone.sh.j2
+        dest: '/var/lib/mongo_script/mongodb_backup.sh'
+
+    - name: Create mongodb backup directory
+      file:
+        path: "/mnt/mongo_backup"
+        state: directory
+
+    - name: Mount share to backup repository
+      mount:
+        path: /mnt/mongo_backup
+        src: //groupe-vecteurplus.com/Backup/MONGODB
+        fstype: cifs
+        opts: "_netdev,users,auto,credentials=/root/.smbcred"
+        state: mounted
+
+    - name: Create cron task for backup script
+      cron:
+        name: "backup mongodb"
+        minute: "0"
+        hour: "21"
+        job: "/bin/bash /var/lib/mongo_script/mongodb_backup.sh > /mnt/mongo_backup/{{ env }}/{{ app }}/backup.log 2>&1"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}

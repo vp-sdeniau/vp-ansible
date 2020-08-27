@@ -1,0 +1,57 @@
+---
+# file: mt-onboard.yml
+
+# This tells the mid-tier to onboard the tenant
+
+# This is running on the CommandLine host but for this script to work it will need
+# the Consul client token as well as the postgres libs available as well.
+
+- name: "Onboard tenant"
+  hosts: CommandLine
+  any_errors_fatal: true
+  gather_facts: false
+  become: false
+
+  vars:
+    tenant_onboard_conf: "{{ SASROOT }}/viya/config/tenant_onboard_{{ DEPLOYMENT_ID }}.conf"
+    sas_provider_endpoint_scheme: "{{ provider_endpoint_scheme | default('http') }}"
+    sas_provider_endpoint_port: "{{ provider_endpoint_port | default('80') }}"
+    sas_skip_ldap_config: "{{ skip_ldap_config | default('false') }}"
+
+  tasks:
+    - name: Create file
+      file:
+        path: "{{ tenant_onboard_conf }}"
+        state: touch
+        mode: "0664"
+        owner: "{{ tenant_admin }}"
+        group: "{{ tenant_admin_group }}"
+      become: yes
+      become_user: root
+
+    - name: Add environment variables
+      become: 'yes'
+      become_user: root
+      lineinfile:
+        dest: "{{ tenant_onboard_conf }}"
+        regexp: "{{ item.regex }}"
+        line: "{{ item.line}}"
+      with_items:
+        - { regex: "^\\s*export\\s+SASROOT\\s*=",                line: "export SASROOT='{{ SASROOT }}'" }
+        - { regex: "^\\s*export\\s+SASTENANT\\s*=",              line: "export SASTENANT='{{ sas_tenant }}'" }
+        - { regex: "^\\s*export\\s+SASPROVIDERADMIN\\s*=",       line: "export SASPROVIDERADMIN='{{ provider_admin }}'" }
+        - { regex: "^\\s*export\\s+SASTENANTADMIN\\s*=",         line: "export SASTENANTADMIN='{{ tenant_admin }}'" }
+        - { regex: "^\\s*export\\s+SASSKIPLDAPCONFIG\\s*=",      line: "export SASSKIPLDAPCONFIG='{{ sas_skip_ldap_config | lower }}'" }
+        - { regex: "^\\s*export\\s+PROVIDERENDPOINTSCHEME\\s*=", line: "export PROVIDERENDPOINTSCHEME='{{ sas_provider_endpoint_scheme }}'" }
+        - { regex: "^\\s*export\\s+PROVIDERENDPOINTHOST\\s*=",   line: "export PROVIDERENDPOINTHOST='{{ hostvars[groups['httpproxy'][0]]['sas_vars']['hostname_fqdn'] }}'" }
+        - { regex: "^\\s*export\\s+PROVIDERENDPOINTPORT\\s*=",   line: "export PROVIDERENDPOINTPORT='{{ sas_provider_endpoint_port }}'" }
+
+    - name: Run the onboarding script
+      become: 'yes'
+      become_user: root
+      run_once: true
+      command: "{{ SASROOT }}/viya/home/bin/tenant_onboard.sh --file {{ tenant_onboard_conf }}"
+      environment:
+        SAS_PROVIDER_ADMIN_PWD: '{{ provider_admin_pwd }}'
+        SAS_PROVIDER_TENANT_PWD: '{{ tenant_provider_pwd }}'
+...

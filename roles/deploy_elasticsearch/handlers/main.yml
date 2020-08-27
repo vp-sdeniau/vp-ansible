@@ -1,0 +1,12 @@
+---
+- name: "source environment file"
+  shell: "{{ item }}"
+  with_items:
+    - source /etc/environment
+  args:
+    executable: /bin/bash
+
+- name: "start service elasticsearch"
+  service:
+    name: elasticsearch
+    state: started

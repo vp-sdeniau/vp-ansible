@@ -1,0 +1,178 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-4.0.yml \
+# --extra-var "target=mdb_prd_nk env=PRD app=NK"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Install prerequiste packages
+      apt:
+        update_cache=yes
+        state=latest
+        name={{ item }}
+      with_items:
+        - cifs-utils
+        - dirmngr
+        - apt-transport-https
+
+    - name: add key ubuntu repository
+      apt_key:
+        keyserver: keyserver.ubuntu.com
+        id: 9DA31620334BD75D9DCB49F368818C72E52529D4
+
+    - apt_repository:
+        repo: deb http://repo.mongodb.org/apt/debian stretch/mongodb-org/4.0 main
+        state: present
+        filename: mongodb-org-4.0.list
+
+    - name: install mongodb_4.0
+      apt:
+        update_cache=yes
+        state=present
+        name={{ item }}
+      with_items:
+          - mongodb-org=4.0.0
+
+    - name: Removed default mogodb files
+      file:
+        path: "/var/lib/mongodb/"
+        state: absent
+
+    - name: Create mongodb directory
+      file:
+        path: "/var/lib/mongodb"
+        state: directory
+        owner: mongodb
+        group: mongodb
+
+    - name: Updating mongod.conf file
+      template:
+        src: mongod.conf.j2
+        dest: '/etc/mongod.conf'
+
+    - name: start service mongod
+      service:
+        name=mongod
+        state=started
+
+    - name: reload daemon
+      command: systemctl daemon-reload
+
+    - name: set autostartup mongod service
+      command: systemctl enable mongod.service
+
+    - name: Updating mongodb.conf file
+      template:
+        src: mongod_repl.conf.j2
+        dest: '/etc/mongod.conf'
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       nofile  64000'
+        create: yes
+
+    - name: Add nproc conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       nproc  64000'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nofile  64000'
+        create: yes
+
+    - name: Add nproc conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nproc  64000'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       memlock  unlimited'
+        create: yes
+
+    - name: Add DefaultLimitNOFILE conf to system.conf
+      lineinfile:
+        path: /etc/systemd/system.conf
+        line: 'DefaultLimitNOFILE=64000'
+        create: yes
+
+    - name: Add DefaultLimitNOFILE conf to user.conf
+      lineinfile:
+        path: /etc/systemd/user.conf
+        line: 'DefaultLimitNOFILE=64000'
+        create: yes
+
+    - name: Start service mongodb
+      service:
+        name=mongod
+        state=restarted
+
+    - name: Copy the initialization script to tmp
+      copy:
+        src=files/init_replication_{{ env }}_{{ app }}.js
+        dest=/tmp/init_replication.js
+
+    - name: Initiate ReplicaSet
+      shell: mongo /tmp/init_replication.js
+      when: "'01' in ansible_hostname or '11' in ansible_hostname"
+
+    - name: Copy backup scripts
+      copy:
+        src=files/mongo_script
+        dest=/var/lib/
+        owner=root
+        group=root
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Copy credentials file
+      copy:
+        src=files/.smbcred
+        dest=/root/.smbcred
+        owner=root
+        group=root
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Updating mongo_script.sh file
+      template:
+        src: mongodb_backup_Cluster.sh.j2
+        dest: '/var/lib/mongo_script/mongodb_backup.sh'
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Create mongodb backup directory
+      file:
+        path: "/mnt/mongo_backup"
+        state: directory
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Mount share to backup repository
+      mount:
+        path: /mnt/mongo_backup
+        src: //groupe-vecteurplus.com/Backup/MONGODB
+        fstype: cifs
+        opts: "_netdev,users,auto,credentials=/root/.smbcred"
+        state: mounted
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Create cron task for backup script
+      cron:
+        name: "backup mongodb"
+        minute: "0"
+        hour: "21"
+        job: "/bin/bash /var/lib/mongo_script/mongodb_backup.sh > /mnt/mongo_backup/{{ env }}/{{ app }}/backup.log 2>&1"
+      when: "'03' in ansible_hostname or '13' in ansible_hostname"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}

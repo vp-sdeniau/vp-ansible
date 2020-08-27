@@ -1,0 +1,5 @@
+-e 
+Java System Check
+-----------------
+
+- On L-PRD-SAS-01.groupe-vecteurplus.com setting SAS_JAVA_HOME to /usr/lib/jvm/jre-1.8.0

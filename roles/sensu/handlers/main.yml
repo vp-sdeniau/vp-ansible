@@ -1,0 +1,5 @@
+---
+- name: "Restart sensu-client"
+  win_service:
+    name: "sensu-client"
+    state: "restarted"

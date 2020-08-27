@@ -1,0 +1,27 @@
+#ansible-playbook deploy_SNMP_Ded.yml --extra-var "target=es_prd_nk"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: install packages
+      apt:
+        update_cache=yes
+        state=latest
+        name={{ item }}
+      with_items:
+        - snmpd
+        - snmp
+        - libnet-snmp-perl
+        - libsnmp-perl
+
+    - name: copie fichier de conf snmpd.conf
+      copy:
+        src=files/snmpd.conf
+        dest=/etc/snmp/snmpd.conf
+        owner=root
+        group=root
+
+    - name: restart service snmpd
+      service:
+        name=snmpd
+        state=restarted

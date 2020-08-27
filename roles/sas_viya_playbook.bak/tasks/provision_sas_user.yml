@@ -1,0 +1,51 @@
+---
+- name: Verify the installation user home directory
+  stat: path=~{{ INSTALL_USER }}
+  become: yes
+  register: home_directory
+
+- name: Create installation user home directory if required
+  file: path=~{{ INSTALL_USER }} state=directory owner={{ INSTALL_USER }} group={{ INSTALL_GROUP }} mode=0700 follow=yes
+  become: yes
+  become_user: root
+  when: home_directory.stat.exists == false
+
+- name: Verify the installation user .ssh directory
+  stat: path=~{{ INSTALL_USER }}/.ssh
+  become: yes
+  register: ssh_directory
+
+- name: "Create installation user .ssh directory as {{ INSTALL_USER }} if required"
+  file: path=~{{ INSTALL_USER }}/.ssh state=directory mode=0700 follow=yes
+  become: yes
+  when: ssh_directory.stat.exists == false and (home_directory.stat.exists == false or (home_directory.stat.pw_name is defined and home_directory.stat.pw_name == INSTALL_USER))
+
+- name: Create installation user .ssh directory as root if required
+  file: path=~{{ INSTALL_USER }}/.ssh state=directory owner={{ INSTALL_USER }} group={{ INSTALL_GROUP }} mode=0700 follow=yes
+  become: yes
+  become_user: root
+  when: ssh_directory.stat.exists == false and home_directory.stat.pw_name is defined and home_directory.stat.pw_name != INSTALL_USER
+
+- name: Create installation user authorized_keys file
+  file: path=~{{ INSTALL_USER }}/.ssh/authorized_keys state=touch mode=0600
+  become: yes
+
+- name: Determine whether the installation user shell requires adjustment
+  script: "../scripts/check_account.sh {{ INSTALL_USER }}"
+  become: yes
+  changed_when: False
+  failed_when: false
+  ignore_errors: true
+  register: check_account_1
+
+- name: Adjust the shell for the installation user
+  user: name={{ INSTALL_USER }} shell=/bin/bash
+  become: yes
+  become_user: root
+  when: "(check_account_1.rc is defined and check_account_1.rc == 3)"
+
+- name: Verify the installation user can log on
+  script: "../scripts/check_account.sh {{ INSTALL_USER }}"
+  become: yes
+  register: check_account_2
+  changed_when: check_account_2.rc != 0

@@ -1,0 +1,102 @@
+# Utilisation du playbook:
+# ansible-playbook roles/admin_docker/tasks/maintenance_cluster.yml \
+# --extra-var  "target=docker_rec upgrade=true"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Changed {{ ansible_hostname }} stat to drain
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability drain {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'01' in ansible_hostname"
+
+    - name: Verified if {{ ansible_hostname }} have zero container
+      shell: docker container ls -q | wc -l
+      register: result
+      until: result.stdout.find("0") != -1
+      retries: 10 
+      delay: 10
+      when: "'01' in ansible_hostname"
+
+      #    - name: Update packages
+      #apt:
+      #  upgrade: dist
+      #when: "'true' in upgrade"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}
+      when: "'01' in ansible_hostname"
+
+    - name: Changed {{ ansible_hostname }} stat to active
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability active {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'01' in ansible_hostname"
+
+    - name: Changed {{ ansible_hostname }} stat to drain
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability drain {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'02' in ansible_hostname"
+
+    - name: Verified if {{ ansible_hostname }} have zero container
+      shell: docker container ls -q | wc -l
+      register: result
+      until: result.stdout.find("0") != -1
+      retries: 10
+      delay: 10
+      when: "'02' in ansible_hostname"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}
+      when: "'02' in ansible_hostname"
+
+    - name: Changed {{ ansible_hostname }} stat to active
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability active {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'02' in ansible_hostname"
+
+    - name: Changed {{ ansible_hostname }} stat to drain
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability drain {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'03' in ansible_hostname"
+
+    - name: Verified if {{ ansible_hostname }} have zero container
+      shell: docker container ls -q | wc -l
+      register: result
+      until: result.stdout.find("0") != -1
+      retries: 10
+      delay: 10
+      when: "'03' in ansible_hostname"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}
+      when: "'03' in ansible_hostname"
+
+    - name: Changed {{ ansible_hostname }} stat to active
+      shell: "{{ item }}"
+      with_items:
+        - docker node update --availability active {{ ansible_hostname }}
+      args:
+        executable: /bin/bash
+      when: "'03' in ansible_hostname"
+
+    - name: Start rebalanced container task
+      script: start-rebalanced-services.sh
+      when: "'01' in ansible_hostname"

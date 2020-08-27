@@ -1,0 +1,12 @@
+---
+- name: install libselinux-python
+  yum:
+    name: libselinux-python
+    state: present
+  become: yes
+  become_user: root
+
+- setup:
+    gather_subset:
+    - "!hardware"
+    - network

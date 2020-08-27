@@ -1,0 +1,166 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_elasticsearch/tasks/install_Elasticsearch-7.0.0.yml \
+# --extra-var "target=es_prd_ar env=PRD app=AR port_es=9241"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Install prerequiste packages
+      apt:
+        name: "{{ packages }}"
+        update_cache: true
+        state: latest
+      vars:
+        packages:
+        - default-jre
+        - jq
+        - curl
+        - cifs-utils
+        - dirmngr
+        - apt-transport-https
+
+    - name: add key elasticsearch repository
+      apt_key:
+        url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        state: present
+
+    - apt_repository:
+        repo: deb https://artifacts.elastic.co/packages/7.x/apt stable main
+        state: present
+        filename: elastic-7.x.list
+
+    - name: install elasticsearch 7.0.0
+      apt:
+        name: "{{ packages }}"
+        update_cache: true
+        state: present
+      vars:
+        packages:
+        - elasticsearch=7.0.0
+
+    - name: Update environment file for JAVA
+      copy:
+        content: 'JAVA_HOME=/usr/lib/jvm/default-java'
+        dest: "/etc/environment"
+
+    - name: Source environment file
+      shell: "{{ item }}"
+      with_items:
+        - source /etc/environment
+      args:
+        executable: /bin/bash
+
+    - name: Updating elasticsearch.yml file
+      template:
+        src: elasticsearch_{{ env }}_{{ app }}.yml.j2
+        dest: /etc/elasticsearch/elasticsearch.yml
+
+    - name: Add LimitMEMLOCK conf to elasticsearch.service
+      lineinfile:
+        path: /usr/lib/systemd/system/elasticsearch.service
+        insertafter: '^\[Service\]$'
+        line: 'LimitMEMLOCK=infinity'
+        state: present
+
+    - name: Copy jvm.options file
+      copy:
+        src=files/{{ env }}/jvm.options_{{ app }}
+        dest=/etc/elasticsearch/jvm.options
+        owner=root
+        group=elasticsearch
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'elasticsearch       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'elasticsearch       -       nofile  65535'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nofile  65535'
+        create: yes
+
+    - name: reload daemon
+      command: systemctl daemon-reload
+
+    - name: start service elasticsearch
+      service:
+        name=elasticsearch
+        state=started
+
+    - name: set autostartup mongod service
+      command: systemctl enable elasticsearch.service
+
+    - name: Copy credentials file
+      copy:
+        src=files/.smbcred
+        dest=/root/.smbcred
+        owner=root
+        group=root
+
+    - name: Create elasticsearch backup directory
+      file:
+        path: "/mnt/es_backup"
+        state: directory
+
+    - name: Mount share to backup repository
+      mount:
+        path: /mnt/es_backup
+        src: //groupe-vecteurplus.com/Backup/ELASTICSEARCH
+        fstype: cifs
+        opts: "_netdev,users,auto,credentials=/root/.smbcred,uid=110,gid=113,file_mode=0775,dir_mode=0775"
+        state: mounted
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}
+
+    - name: Copy backup scripts
+      copy:
+        src=files/elastic_script
+        dest=/var/lib/
+        owner=root
+        group=root
+      when: "'33' in ansible_hostname"
+
+    - name: Updating permission elasticsearch_script.sh
+      file:
+        path: '/var/lib/elastic_script/elasticsearch_backup.sh'
+        mode: '755'
+      when: "'33' in ansible_hostname"
+
+    - name: Create cron task for backup script
+      cron:
+        name: "backup elasticsearch"
+        minute: "0"
+        hour: "23"
+        job: "/bin/bash /var/lib/elastic_script/elasticsearch_backup.sh > /var/lib/elastic_script/backup.log 2>&1"
+      when: "'33' in ansible_hostname"
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}
+      when: "'33' in ansible_hostname"
+
+    - name: Create repository backup elasticsearch
+      uri:
+        url: http://{{ ansible_hostname }}:{{ port_es }}/_snapshot/backup
+        method: PUT
+        body: '{"type":"fs","settings":{"location":"{{ app }}","compress":true}}'
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+      when: "'33' in ansible_hostname"

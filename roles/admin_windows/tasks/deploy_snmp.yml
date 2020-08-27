@@ -1,0 +1,12 @@
+- name: Install Windows SNMP feature
+  hosts: server_rds
+  tasks:
+    - name: Install SNMP-Service
+      win_feature:
+        name: SNMP-Service
+        state: present
+
+    - name: Install SNMP-WMI-Provider
+      win_feature:
+        name: SNMP-WMI-Provider
+        state: present

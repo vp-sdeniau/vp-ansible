@@ -1,0 +1,58 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-3.2.1.yml \
+# --extra-var "target=mdb_prd_nk env=PRD app=NK"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       nofile  64000'
+        create: yes
+
+    - name: Add nproc conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       nproc  64000'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: '*       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nofile  64000'
+        create: yes
+
+    - name: Add nproc conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nproc  64000'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       memlock  unlimited'
+        create: yes
+
+    - name: Add DefaultLimitNOFILE conf to system.conf
+      lineinfile:
+        path: /etc/systemd/system.conf
+        line: 'DefaultLimitNOFILE=64000'
+        create: yes
+
+    - name: Add DefaultLimitNOFILE conf to user.conf
+      lineinfile:
+        path: /etc/systemd/user.conf
+        line: 'DefaultLimitNOFILE=64000'
+        create: yes
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}

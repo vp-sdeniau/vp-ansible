@@ -1,0 +1,10 @@
+---
+- name: Include redhat httpd role
+  include_role:
+    name: httpd-x64_redhat_linux_6-yum
+  when: inventory_hostname in groups['sas-hosts-x64_redhat_linux_6-yum'] | default([])
+
+- name: Include suse apache2 role
+  include_role:
+    name: apache2-x64_suse_linux_12-yum
+  when: inventory_hostname in groups['sas-hosts-x64_suse_linux_12-yum'] | default([])

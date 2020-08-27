@@ -1,0 +1,22 @@
+---
+- name: Mount EBP prd share to nfs directory
+  mount:
+    path: /mnt/nfs
+    src: 10.53.2.70:/DATA/docker_prd
+    fstype: nfs
+    opts: defaults
+    dump: '0'
+    passno: '0'
+    state: mounted
+  when: ent == 'EBP'
+
+- name: Mount VP prd share to nfs directory
+  mount:
+    path: /mnt/nfs
+    src: 172.17.0.12:/var/DATA
+    fstype: nfs
+    opts: defaults
+    dump: '0'
+    passno: '0'
+    state: mounted
+  when: ent == 'VP'

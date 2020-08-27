@@ -1,0 +1,16 @@
+---
+# system assessment playbook
+
+- hosts: sas-all
+  tasks:
+  - set_fact:
+      orchestration_root: '{{ playbook_dir }}'
+
+- include: internal/set-assessment-facts.yml
+- include: internal/third-party-assessment.yml
+- include: internal/gather-host-facts.yml
+- include: internal/validate.yml
+- include: internal/host-setup.yml
+- include: internal/repo-setup.yml
+- include: internal/ensure-install-user.yml
+- include: internal/host-verification.yml

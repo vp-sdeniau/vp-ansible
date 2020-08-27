@@ -1,0 +1,10 @@
+---
+- name: Include redhat host-verification role
+  include_role:
+    name: host-verification-x64_redhat_linux_6-yum
+  when: inventory_hostname in groups['sas-hosts-x64_redhat_linux_6-yum'] | default([])
+
+- name: Include suse host-verification role
+  include_role:
+    name: host-verification-x64_suse_linux_12-yum
+  when: inventory_hostname in groups['sas-hosts-x64_suse_linux_12-yum'] | default([])

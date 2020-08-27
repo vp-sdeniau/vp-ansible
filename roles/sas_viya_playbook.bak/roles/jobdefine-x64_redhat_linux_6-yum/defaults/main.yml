@@ -1,0 +1,19 @@
+---
+SERVICE_APP_NAME: jobdefine
+SERVICE_FACET: jobDefinitions
+SERVICE_INSTANCES_COUNT: '{{ play_hosts | length }}'
+SERVICE_NAME: '{{ SERVICE_NAME_DEFAULT }}'
+SERVICE_PRODUCT_NAME: jobdefinitions
+SERVICE_SYSCONFIG_PATH: /etc/sysconfig/sas/{{ SERVICE_NAME }}
+SERVICE_YUM_PACKAGE: sas-jobdefinitions
+consumer_items:
+  certificateAuthority-generateTokenForSecretsAndCertificates:
+    APPNAME: jobdefine
+    DESTINATION_DIRECTORY: '{{ SAS_CONFIG_ROOT }}/etc/SASSecurityCertificateFramework/tokens/jobDefinitions/{{
+      INSTANCE_ID }}'
+    DESTINATION_FILENAME: vault.token
+    DESTINATION_GROUP: '{{ INSTALL_GROUP }}'
+    DESTINATION_MODE: '0600'
+    DESTINATION_OWNER: '{{ INSTALL_USER }}'
+    DESTINATION_app.name: jobDefinitions
+    DESTINATION_destination.file.name: value.token

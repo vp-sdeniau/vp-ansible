@@ -1,0 +1,16 @@
+---
+- hosts: docker_prd
+  remote_user: root
+
+  tasks:
+  - name: Purge des Images
+    command: docker image prune -f
+
+  - name: Purge des Volumes
+    command: docker volume prune -f
+
+  - name: Purge des Containers
+    command: docker container prune -f
+
+  - name: Purges des Taches
+    script: purge_task_docker.sh

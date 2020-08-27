@@ -1,0 +1,15 @@
+---
+- hosts: l-rec-nlb-01
+  remote_user: root
+
+  tasks:
+    - name: Set server VPPPRNODEPR2 to enable state
+      haproxy:
+        state: enabled
+        host: VPPPRNODEPR2
+        socket: /tmp/haproxy.socket
+        backend: VPPPRNODEPRx_http_ipvANY
+        #draining: yes
+        wait: yes
+        wait_interval: 10
+        wait_retries: 5

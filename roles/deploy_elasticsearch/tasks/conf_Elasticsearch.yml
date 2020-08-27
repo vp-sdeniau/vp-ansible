@@ -1,0 +1,62 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_elasticsearch/tasks/conf_Elasticsearch.yml --extra-var "target=els_prd_nk pre_version_5=true jvm=8"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Active LimitMEMLOCK conf to elasticsearch.service
+      shell: sed -i '/LimitMEMLOCK/s/^#//g' /usr/lib/systemd/system/elasticsearch.service
+
+    - name: Active EnvironmentFile conf to elasticsearch.service
+      shell: sed -i -r 's/"EnvironmentFile=-/etc/default/elasticsearch"/"EnvironmentFile=/etc/default/elasticsearch"/' /usr/lib/systemd/system/elasticsearch.service
+
+    - name: Active mlockall conf to elasticsearch.yml
+      shell: sed -i '/bootstrap.mlockall/s/^#//g' /etc/elasticsearch/elasticsearch.yml
+      when: "'true' in pre_version_5"
+
+    - name: Changed elasticsearch java memory options
+      shell: sed -i -r 's/#ES_JAVA_OPTS=/ES_JAVA_OPTS="-Xms{{ jvm }}g -Xmx{{ jvm }}g"/' /etc/default/elasticsearc
+      when: "'true' in pre_version_5"
+
+    - name: Active memory_lock conf to elasticsearch.yml
+      shell: sed -i '/bootstrap.memory_lock/s/^#//g' /etc/elasticsearch/elasticsearch.yml
+      when: "'false' in pre_version_5"
+
+    - name: Changed elasticsearch java XMS memory options
+      shell: sed -i -r 's/-Xms1g/-Xms{{ jvm }}g/' /etc/elasticsearch/jvm.options
+      when: "'false' in pre_version_5"
+
+    - name: Changed elasticsearch java XMX memory options
+      shell: sed -i -r 's/-Xmx1g/-Xmx{{ jvm }}g/' /etc/elasticsearch/jvm.options
+      when: "'false' in pre_version_5"
+
+    - name: Reload daemon
+      command: systemctl daemon-reload
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'elasticsearch       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'elasticsearch       -       nofile  65535'
+        create: yes
+
+    - name: Add memlock conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       memlock  unlimited'
+        create: yes
+
+    - name: Add nofile conf to limit.conf
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: 'root       -       nofile  65535'
+        create: yes
+
+    - name: Reboot {{ ansible_hostname }}
+      reboot:
+        test_command: ping -c 4 {{ ansible_default_ipv4.address }}

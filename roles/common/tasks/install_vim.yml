@@ -1,0 +1,12 @@
+---
+- hosts: all
+  remote_user: root
+
+  tasks:
+  - name: install vim packages for all servers
+    apt:
+     update_cache=yes
+     state=latest
+     name={{item}}
+    with_items:
+    - vim

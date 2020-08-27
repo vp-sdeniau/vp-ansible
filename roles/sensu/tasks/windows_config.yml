@@ -1,0 +1,11 @@
+---
+- name: "Updating client.json file"
+  template:
+   src: "/etc/ansible/roles/sensu/templates/client.json.j2"
+   dest: 'C:\opt\sensu\conf.d\client.json'
+
+- name: "Include handlers"
+  include: "/etc/ansible/roles/sensu/handlers/main.yml"
+
+  notify:
+  - Restart sensu-client

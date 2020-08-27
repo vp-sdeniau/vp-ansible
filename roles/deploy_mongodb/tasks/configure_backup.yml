@@ -1,0 +1,45 @@
+# Utilisation du playbook:
+# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-3.2.1.yml \
+# --extra-var "target=mdb_prd_nk env=PRD app=NK"
+---
+- hosts: '{{ target }}'
+  user: root
+  tasks:
+    - name: Copy backup scripts
+      copy:
+        src=files/mongo_script
+        dest=/var/lib/
+        owner=root
+        group=root
+
+    - name: Copy credentials file
+      copy:
+        src=files/.smbcred
+        dest=/root/.smbcred
+        owner=root
+        group=root
+
+    - name: Updating mongo_script.sh file
+      template:
+        src: mongodb_backup.sh.j2
+        dest: '/var/lib/mongo_script/mongodb_backup.sh'
+
+    - name: Create mongodb backup directory
+      file:
+        path: "/mnt/mongo_backup"
+        state: directory
+
+    - name: Mount share to backup repository
+      mount:
+        path: /mnt/mongo_backup
+        src: //groupe-vecteurplus.com/Backup/MONGODB
+        fstype: cifs
+        opts: "_netdev,users,auto,credentials=/root/.smbcred"
+        state: mounted
+
+    - name: Create cron task for backup script
+      cron:
+        name: "backup mongodb"
+        minute: "0"
+        hour: "21"
+        job: "/bin/bash /var/lib/mongo_script/mongodb_backup.sh > /mnt/mongo_backup/{{ env }}/{{ app }}/backup.log 2>&1"

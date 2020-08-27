@@ -1,0 +1,21 @@
+---
+- name: initialize swarm cluster
+  docker_swarm:
+    state: present
+    advertise_addr: "{{ ansible_default_ipv4.address }}:2377"
+  when: "'01' in ansible_hostname or '10' in ansible_hostname"
+
+- name: retrieve swarm manager token
+  shell: docker swarm join-token -q manager
+  register: swarm_manager_token
+  when: "'01' in ansible_hostname or '10' in ansible_hostname"
+
+- name: join worker nodes to cluster
+  vars:
+    token: "{{ ['swarm_manager_token'] }}"
+  docker_swarm:
+    state: join
+    advertise_addr: "{{ ansible_default_ipv4.address }}"
+    join_token: {{ token }}
+    remote_addrs: "{{ manager_ip }}:2377"
+  when: "ansible_default_ipv4.address != '{{ manager_ip }}'"

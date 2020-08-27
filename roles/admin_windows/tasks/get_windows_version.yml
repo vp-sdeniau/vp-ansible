@@ -1,0 +1,10 @@
+---
+- hosts: all
+
+  tasks:
+   - name: Get Windows Version
+     win_shell: "[System.Environment]::OSVersion.Version"
+     register: version
+
+   - debug:
+       var: version.stdout_lines

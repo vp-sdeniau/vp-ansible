@@ -1,0 +1,18 @@
+{
+    "client": {
+        "name": "{{ ansible_hostname }}",
+        "address": "{{ ansible_ip_addresses[0] }}",
+        "subscriptions": [
+            "ALL",
+            "default",
+            "windows"
+        ],
+        "keepalive": {
+            "handler": "default"
+        },
+        "socket": {
+            "bind": "127.0.0.1",
+            "port": 3030
+        }
+    }
+}

@@ -1,0 +1,44 @@
+---
+# This play validates the entries of the SAS Viya PostgreSQl Infrastructure Data Server in inventory.ini and vars.yml
+
+- name: Validate the SAS Viya PostgreSQL Infrastructure Data Server entries in inventory.ini and vars.yml
+  hosts: sasdatasvrc:pgpoolc
+  any_errors_fatal: true
+  gather_facts: false
+  become: false
+  vars:
+    - required_third_party_assessment_results: []
+    - required_ansible_min_version: "2.8"
+    - required_jinja_min_version: "2.7.2"
+
+  vars_files:
+  - ../vars.yml
+
+  pre_tasks:
+  ###########################################################################
+  # Make sure that Ansible 2.8 and Jinja version 2.7 are installed
+
+  - block:
+    - name: Verify that a required Ansible version is installed first
+      set_fact:
+        required_third_party_assessment_results: '{{ required_third_party_assessment_results }} + [ ''The Ansible version check failed. The Postgres playbook validation task requires Ansible, version {{ required_ansible_min_version }} or later.'' ]'
+      when: ansible_version.full | version_compare(required_ansible_min_version, '<')
+
+    - action: jinja_version
+      register: installed_jinja_test
+
+    - set_fact:
+         required_third_party_assessment_results: '{{ required_third_party_assessment_results }} +  [ ''The Jinja2 version check failed. The Postgres playbook validation task requires Jinja2, version {{ required_jinja_min_version }} or later.'' ]'
+      when: installed_jinja_test.msg | version_compare(required_jinja_min_version, '<')
+
+    delegate_to: localhost
+    run_once: yes
+
+  - name: Halt execution on any third-party assessment check failures
+    fail:
+      msg: 'At least one third-party assessment check failed: {{ '' ''.join(required_third_party_assessment_results) }}'
+    failed_when: required_third_party_assessment_results | length > 0
+    run_once: yes
+
+  roles:
+    - validate-postgres-rules
