@@ -1,0 +1,11 @@
+# Utilisation du playbook:
+# ansible-playbook roles/admin_linux/tasks/set_resolv.conf.yml --extra-var "target=es_rec_dp"
+---
+- hosts: '{{ target }}'
+  tasks:
+    - name: copie du fichier resolv.conf
+      copy:
+        src=files/resolv.conf
+        dest=/etc/resolv.conf
+        owner=root
+        group=root
