@@ -6,10 +6,11 @@
   tasks:
     - name: Install prerequiste packages
       apt:
-        update_cache=yes
-        state=latest
-        name={{ item }}
-      with_items:
+        name: "{{ packages }}"
+        update_cache: true
+        state: latest
+      vars:
+        packages:
         - cifs-utils
         - dirmngr
         - apt-transport-https
