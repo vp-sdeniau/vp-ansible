@@ -25,13 +25,13 @@
         state: present
         filename: mongodb-org-4.0.list
 
-    - name: install mongodb_4.0.9
+    - name: install mongodb_4.0.15
       apt:
         update_cache=yes
         state=present
         name={{ item }}
       with_items:
-          - mongodb-org=4.0.9
+          - mongodb-org=4.0.15
 
     - name: Updating mongod.conf file
       template:
