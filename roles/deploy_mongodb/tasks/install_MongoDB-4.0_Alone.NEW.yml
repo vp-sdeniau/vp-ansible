@@ -1,6 +1,5 @@
 # Utilisation du playbook:
-# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-4.0.yml \
-# --extra-var "target=mdb_prd_nk env=PRD app=NK"
+# ansible-playbook roles/deploy_mongodb/tasks/install_MongoDB-4.0.yml --extra-var "target=mdb_prd_nk env=PRD app=NK"
 ---
 - hosts: '{{ target }}'
   user: root
@@ -118,9 +117,9 @@
     - name: Mount share to backup repository
       mount:
         path: /mnt/mongo_backup
-        src: //groupe-vecteurplus.com/Backup/MONGODB
-        fstype: cifs
-        opts: "_netdev,users,auto,credentials=/root/.smbcred"
+        src: l-inf-bck-01.groupe-vecteurplus.com:/var/mongodb_bck_{{app}}
+        fstype: nfs
+        opts: "defaults"
         state: mounted
 
     - name: Create cron task for backup script
